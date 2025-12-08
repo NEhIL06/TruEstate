@@ -2,3 +2,4 @@ backend/node_modules
 frontend/node_modules
 pnpm-lock.yaml
 backend/.env
+backend/src/dataset.csv
