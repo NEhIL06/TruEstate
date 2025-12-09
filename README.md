@@ -40,7 +40,7 @@ Efficient data loading is achieved through server-side pagination.
 5. Start the server: `npm run dev`
 
 ### Frontend
-1. Navigate to the frontend directory: `cd salesmanagement`
+1. Navigate to the frontend directory: `cd frontend`
 2. Install dependencies: `npm install`
 3. Start the development server: `npm run dev`
 4. Open [http://localhost:3000](http://localhost:3000) in your browser.

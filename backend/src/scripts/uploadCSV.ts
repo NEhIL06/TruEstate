@@ -1,12 +1,3 @@
-/**
- * Enterprise-grade Supabase CSV Uploader
- *
- * - Chunked processing to avoid statement timeout
- * - All fields CSV-escaped safely
- * - Tags converted to Postgres text[] literal
- * - Column order exactly matches COPY columns
- * - Retries chunks on failure (3 attempts)
- */
 
 import fs from "fs";
 import path from "path";
@@ -17,26 +8,17 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const CHUNK_SIZE = 20_000;                      // rows per chunk
+const CHUNK_SIZE = 20_000;                     
 const TEMP_DIR = path.join(__dirname, "chunks");
 
-// Ensure temporary folder exists
 if (!fs.existsSync(TEMP_DIR)) {
   fs.mkdirSync(TEMP_DIR, { recursive: true });
 }
-
-// --------- CSV / Field Sanitization Helpers --------- //
-
-/**
- * Convert raw tags string → Postgres array literal.
- * Input in CSV:  "organic,skincare"
- * Output for DB: {organic,skincare}
- */
 function sanitizeTags(raw: string | null | undefined): string {
   if (!raw || raw.trim() === "") return "{}";
 
   const cleaned = raw
-    .replace(/"/g, "")              // remove any quotes
+    .replace(/"/g, "")              
     .split(",")
     .map((t) => t.trim())
     .filter((t) => t.length > 0);
@@ -46,27 +28,17 @@ function sanitizeTags(raw: string | null | undefined): string {
   return `{${cleaned.join(",")}}`;
 }
 
-/**
- * Convert any value to a safe CSV field:
- * - if null/undefined/"" → empty field (treated as NULL in Postgres)
- * - otherwise → wrap in double quotes, escape internal quotes
- */
 function toCSVField(value: unknown): string {
   if (value === null || value === undefined || value === "") {
     return "";
   }
 
   const str = String(value);
-  const escaped = str.replace(/"/g, '""'); // escape internal quotes
+  const escaped = str.replace(/"/g, '""');      
 
-  // Always quote non-empty fields to be safe with commas/newlines
   return `"${escaped}"`;
 }
 
-/**
- * Build one sanitized CSV line for COPY from an input row.
- * Order MUST match COPY column order exactly.
- */
 function sanitizeRow(row: any): string {
   const tagsLiteral = sanitizeTags(row["Tags"]);
 
@@ -99,16 +71,11 @@ function sanitizeRow(row: any): string {
     row["Employee Name"],      // employee_name
   ];
 
-  // Convert each to a CSV-safe field
   const csvFields = orderedValues.map(toCSVField);
   return csvFields.join(",");
 }
 
-// --------- Chunking Logic --------- //
 
-/**
- * Write a chunk file with header + sanitized rows.
- */
 function writeChunk(filename: string, rows: string[]): void {
   const header = [
     "transaction_id",
@@ -143,11 +110,9 @@ function writeChunk(filename: string, rows: string[]): void {
   fs.writeFileSync(filename, content, { encoding: "utf8" });
 }
 
-/**
- * Read the master CSV, sanitize rows, and split into chunk files.
- */
+
 async function createChunks(csvPath: string): Promise<{ chunkFiles: string[]; totalRows: number }> {
-  console.log("📄 Reading CSV and creating chunks...");
+  console.log("Reading CSV and creating chunks...");
 
   const chunkFiles: string[] = [];
   let buffer: string[] = [];
@@ -167,7 +132,7 @@ async function createChunks(csvPath: string): Promise<{ chunkFiles: string[]; to
           const file = path.join(TEMP_DIR, `chunk_${chunkIndex}.csv`);
           writeChunk(file, buffer);
           chunkFiles.push(file);
-          console.log(`📝 Created chunk ${chunkIndex}`);
+          console.log("Created chunk ${chunkIndex}");
           buffer = [];
           chunkIndex++;
         }
@@ -177,20 +142,15 @@ async function createChunks(csvPath: string): Promise<{ chunkFiles: string[]; to
           const file = path.join(TEMP_DIR, `chunk_${chunkIndex}.csv`);
           writeChunk(file, buffer);
           chunkFiles.push(file);
-          console.log(`📝 Created chunk ${chunkIndex}`);
+          console.log("Created chunk ${chunkIndex}");
         }
 
-        console.log(`📦 Total rows: ${totalRows}. Total chunks: ${chunkFiles.length}`);
+        console.log(`Total rows: ${totalRows}. Total chunks: ${chunkFiles.length}`);
         resolve({ chunkFiles, totalRows });
       });
   });
 }
 
-// --------- Upload Logic (with retries) --------- //
-
-/**
- * Upload a single chunk with COPY. Retries up to 3 times before failing.
- */
 async function uploadChunk(client: Client, file: string, index: number, totalChunks: number) {
   console.log(`⏳ Uploading chunk ${index + 1}/${totalChunks}...`);
 
@@ -238,42 +198,42 @@ async function uploadChunk(client: Client, file: string, index: number, totalChu
           .on("error", (err) => reject(err));
       });
 
-      console.log(`✅ Chunk ${index + 1}/${totalChunks} uploaded successfully`);
+      console.log(` Chunk ${index + 1}/${totalChunks} uploaded successfully`);
       return;
     } catch (err: any) {
-      console.error(`⚠️ Chunk ${index + 1} failed (attempt ${attempt}):`, err?.message || err);
+      console.error(` Chunk ${index + 1} failed (attempt ${attempt}):`, err?.message || err);
 
       if (attempt === 3) {
-        console.error(`❌ Chunk ${index + 1} failed permanently. File: ${file}`);
+        console.error(` Chunk ${index + 1} failed permanently. File: ${file}`);
         throw err;
       } else {
-        console.log(`🔁 Retrying chunk ${index + 1}...`);
+        console.log(`Retrying chunk ${index + 1}...`);
       }
     }
   }
 }
 
-// --------- Main Orchestrator --------- //
+
 
 async function startUpload() {
   const csvPath = path.join(__dirname, "../dataset.csv");
 
   if (!fs.existsSync(csvPath)) {
-    console.error("❌ CSV file not found at:", csvPath);
+    console.error(" CSV file not found at:", csvPath);
     process.exit(1);
   }
 
   if (!process.env.DATABASE_URL) {
-    console.error("❌ DATABASE_URL is not set in .env");
+    console.error(" DATABASE_URL is not set in .env");
     process.exit(1);
   }
 
   if (process.env.DATABASE_URL.includes("pooler.supabase.com")) {
-    console.warn("⚠️ WARNING: You are using the Supabase pooler URL.");
+    console.warn(" WARNING: You are using the Supabase pooler URL.");
     console.warn("   For bulk COPY, use the primary DB URL with host 'db.<ref>.supabase.co' and port 5432.");
   }
 
-  console.log("🔌 Connecting to Supabase primary DB...");
+  console.log(" Connecting to Supabase primary DB...");
 
   const client = new Client({
     connectionString: process.env.DATABASE_URL,
@@ -285,17 +245,17 @@ async function startUpload() {
   const { chunkFiles, totalRows } = await createChunks(csvPath);
   const totalChunks = chunkFiles.length;
 
-  console.log(`🚀 Starting upload of ${totalChunks} chunks (${totalRows.toLocaleString()} rows)...`);
+  console.log(` Starting upload of ${totalChunks} chunks (${totalRows.toLocaleString()} rows)...`);
 
   for (let i = 0; i < totalChunks; i++) {
     await uploadChunk(client, chunkFiles[i], i, totalChunks);
   }
 
-  console.log("🎉 ALL CHUNKS UPLOADED SUCCESSFULLY ✅");
+  console.log(" ALL CHUNKS UPLOADED SUCCESSFULLY");
   await client.end();
 }
 
 startUpload().catch((err) => {
-  console.error("❌ Fatal Error:", err);
+  console.error("Fatal Error:", err);
   process.exit(1);
 });
