@@ -5,10 +5,10 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node index.js",
+    "start": "node dist/index.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "seed": "ts-node src/script.ts",
-    "build": "npx tsx build src/index.ts"
+    "seed": "ts-node-dev src/scripts/uploadCSV.ts",
+    "build": "tsc"
   },
   "keywords": [],
   "author": "",
@@ -17,6 +17,7 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.1.0",
     "@prisma/client": "^7.1.0",
+    "@prisma/client-runtime-utils": "^7.1.0",
     "@supabase/supabase-js": "^2.86.2",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
@@ -25,11 +26,16 @@
     "csv-parser": "^3.2.0",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "fast-csv": "^5.0.5",
     "pg": "^8.16.3",
+    "pg-copy-streams": "^7.0.0",
     "postgres": "^3.4.7",
     "prisma": "^7.1.0",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.9.3",
     "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@types/pg-copy-streams": "^1.2.5"
   }
 }
