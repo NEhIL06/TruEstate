@@ -4,157 +4,122 @@ import { Client } from "pg";
 import { from as copyFrom } from "pg-copy-streams";
 import { parse, format } from "fast-csv";
 import dotenv from "dotenv";
+import cliProgress from "cli-progress";
 
 dotenv.config();
 
-async function main() {
-    console.log("🔌 Connecting to database...");
+async function upload() {
+  console.log("🔌 Connecting...");
 
-    const client = new Client({
-        connectionString: process.env.DATABASE_URL,
-        ssl: { rejectUnauthorized: false },
-    });
+  const client = new Client({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+  });
 
-    await client.connect();
+  await client.connect();
 
-    // Disable statement timeout for this session to allow large uploads
-    await client.query("SET statement_timeout = 0");
+  console.log("📄 Counting total rows in CSV...");
 
-    console.log("🚀 Starting CSV upload using COPY...");
+  const csvPath = path.join(__dirname, "../dataset.csv");
+  const totalRows = await countCSVRows(csvPath);
 
-    const csvPath = path.join(__dirname, "../dataset.csv");
-    console.log("CSV file path:", csvPath);
+  console.log(`📊 Total rows detected: ${totalRows.toLocaleString()}`);
 
-    if (!fs.existsSync(csvPath)) {
-        console.error("❌ CSV file not found:", csvPath);
-        process.exit(1);
-    }
+  // Setup progress bar
+  const bar = new cliProgress.SingleBar(
+    {
+      format: "⏳ Uploading |{bar}| {percentage}% || {value}/{total} rows",
+      barCompleteChar: "█",
+      barIncompleteChar: "░",
+    },
+    cliProgress.Presets.shades_classic
+  );
 
-    // Define columns in the exact order expected by the COPY command
-    const columns = [
-        "transaction_id",
-        "date",
-        "customer_id",
-        "customer_name",
-        "phone_number",
-        "gender",
-        "age",
-        "customer_region",
-        "customer_type",
-        "product_id",
-        "product_name",
-        "brand",
-        "product_category",
-        "tags",
-        "quantity",
-        "price_per_unit",
-        "discount_percentage",
-        "total_amount",
-        "final_amount",
-        "payment_method",
-        "order_status",
-        "delivery_type",
-        "store_id",
-        "store_location",
-        "salesperson_id",
-        "employee_name"
-    ];
+  bar.start(totalRows, 0);
 
-    const copyStream = client.query(
-        copyFrom(`
-      COPY "transactions" (
-        ${columns.map(col => `"${col}"`).join(",\n        ")}
+  console.log("🚀 Preparing COPY command...");
+
+  const copyStream = client.query(
+    copyFrom(`
+      COPY transactions (
+        transaction_id,
+        date,
+        customer_id,
+        customer_name,
+        phone_number,
+        gender,
+        age,
+        customer_region,
+        customer_type,
+        product_id,
+        product_name,
+        brand,
+        product_category,
+        tags,
+        quantity,
+        price_per_unit,
+        discount_percentage,
+        total_amount,
+        final_amount,
+        payment_method,
+        order_status,
+        delivery_type,
+        store_id,
+        store_location,
+        salesperson_id,
+        employee_name
       )
       FROM STDIN WITH (FORMAT csv, HEADER true)
     `)
-    );
+  );
 
-    const fileStream = fs.createReadStream(csvPath);
+  let processed = 0;
 
-    let isFirstRow = true;
-    const transformStream = parse({ headers: true, ignoreEmpty: true, trim: true })
-        .transform((row: any) => {
-            if (isFirstRow) {
-                console.log("First row keys:", Object.keys(row));
-                isFirstRow = false;
-            }
+  fs.createReadStream(csvPath)
+    .pipe(parse({ headers: true }))
+    .transform((row:any) => {
+      processed++;
+      bar.update(processed);
 
-            // Map CSV headers to DB columns if necessary
-            // We'll implement mapping after seeing the logs
+      // Convert tags CSV ("organic,skincare") → PG array {organic,skincare}
+      if (row.Tags) {
+        const tags = row.Tags.replace(/"/g, ""); 
+        const arr = tags.split(",").map((t:any) => t.trim());
+        row.Tags = `{${arr.join(",")}}`;
+      }
 
-            // Validate essential fields to prevent "null value in column..." errors
-            // If date or transaction_id is missing, skip the row
-            // Note: We might need to check row['Transaction ID'] instead of row.transaction_id
-            const date = row.date || row['Date'];
-            const transactionId = row.transaction_id || row['Transaction ID'];
-
-            if (!date || !transactionId) {
-                return null;
-            }
-
-            // Transform tags from "tag1,tag2" to "{tag1,tag2}" for PostgreSQL array format
-            // Check both 'tags' and 'Tags'
-            let tags = row.tags || row['Tags'];
-            if (tags && !tags.startsWith("{")) {
-                tags = `{${tags}}`;
-            }
-
-            // Construct a new row with correct keys matching DB columns
-            return {
-                transaction_id: transactionId,
-                date: date,
-                customer_id: row.customer_id || row['Customer ID'],
-                customer_name: row.customer_name || row['Customer Name'],
-                phone_number: row.phone_number || row['Phone Number'],
-                gender: row.gender || row['Gender'],
-                age: row.age || row['Age'],
-                customer_region: row.customer_region || row['Customer Region'],
-                customer_type: row.customer_type || row['Customer Type'],
-                product_id: row.product_id || row['Product ID'],
-                product_name: row.product_name || row['Product Name'],
-                brand: row.brand || row['Brand'],
-                product_category: row.product_category || row['Product Category'],
-                tags: tags,
-                quantity: row.quantity || row['Quantity'],
-                price_per_unit: row.price_per_unit || row['Price Per Unit'],
-                discount_percentage: row.discount_percentage || row['Discount Percentage'],
-                total_amount: row.total_amount || row['Total Amount'],
-                final_amount: row.final_amount || row['Final Amount'],
-                payment_method: row.payment_method || row['Payment Method'],
-                order_status: row.order_status || row['Order Status'],
-                delivery_type: row.delivery_type || row['Delivery Type'],
-                store_id: row.store_id || row['Store ID'],
-                store_location: row.store_location || row['Store Location'],
-                salesperson_id: row.salesperson_id || row['Salesperson ID'],
-                employee_name: row.employee_name || row['Employee Name']
-            };
-        });
-
-    const formatStream = format({ headers: columns, quote: '"' });
-
-    fileStream
-        .pipe(transformStream)
-        .on("error", (err) => {
-            console.error("❌ CSV Parsing error:", err);
-            process.exit(1);
-        })
-        .pipe(formatStream)
-        .on("error", (err) => {
-            console.error("❌ CSV Formatting error:", err);
-            process.exit(1);
-        })
-        .pipe(copyStream)
-        .on("error", (err) => {
-            console.error("❌ COPY stream error:", err);
-            process.exit(1);
-        })
-        .on("finish", () => {
-            console.log("✅ CSV upload completed successfully!");
-            client.end();
-        });
+      return row;
+    })
+    .pipe(format({ headers: true }))
+    .pipe(copyStream)
+    .on("finish", () => {
+      bar.stop();
+      console.log("\n🎉 DONE — Import completed successfully.");
+      client.end();
+    })
+    .on("error", (err) => {
+      bar.stop();
+      console.error("❌ COPY Error", err);
+      client.end();
+    });
 }
 
-main().catch((err) => {
-    console.error("❌ Fatal Error:", err);
-    process.exit(1);
-});
+// Count lines in CSV quickly (streaming, memory-efficient)
+function countCSVRows(filePath: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    let count = 0;
+
+    fs.createReadStream(filePath)
+      .on("error", reject)
+      .on("data", (chunk) => {
+        for (let i = 0; i < chunk.length; ++i) {
+          if (chunk[i] === 10) count++; // '\n'
+        }
+      })
+      .on("end", () => {
+        resolve(count - 1); // remove header line
+      });
+  });
+}
+
+upload();

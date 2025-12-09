@@ -6,18 +6,17 @@ import { errorHandler, notFoundHandler } from "./utils/errors";
 
 const app = express();
 
-const origin=[
-    "http://localhost:3000",
-    process.env.FRONTEND_URL,
-    "https://tru-estate-teid.vercel.app/"
-]
+const origin = [
+  "http://localhost:3000",
+  process.env.FRONTEND_URL,
+  "https://tru-estate-teid.vercel.app"
+].filter(Boolean) as string[];
 
-app.use(cors(
-    {
-        origin: origin as string[],
-        credentials: true
-    }
-));
+app.use(cors({
+  origin: origin,
+  credentials: true
+}));
+
 app.use(express.json());
 
 app.get("/health", (_req, res) => {
