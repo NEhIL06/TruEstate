@@ -9,7 +9,7 @@ const app = express();
 const origin=[
     "http://localhost:3000",
     process.env.FRONTEND_URL,
-    "https://truestate.vercel.app"
+    "https://tru-estate-teid.vercel.app/"
 ]
 
 app.use(cors(
