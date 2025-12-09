@@ -5,7 +5,7 @@ dotenv.config();
 
 const envSchema = z.object({
   PORT: z.string().default("4000"),
-  SUPABASE_URL: z.url(),
+  DATABASE_URL: z.url(),
   SUPABASE_SERVICE_KEY: z.string().min(10)
 });
 
@@ -18,6 +18,6 @@ if (!parsed.success) {
 
 export const env = {
   PORT: parseInt(parsed.data.PORT, 10),
-  SUPABASE_URL: parsed.data.SUPABASE_URL,
+  DATABASE_URL: parsed.data.DATABASE_URL,
   SUPABASE_SERVICE_KEY: parsed.data.SUPABASE_SERVICE_KEY
 };

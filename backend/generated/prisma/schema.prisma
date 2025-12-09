@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// ------------------------------------------------------
+/// Transaction Table (1 million+ rows optimized)
+/// ------------------------------------------------------
+model Transaction {
+  id            BigInt   @id @default(autoincrement()) @map("id")
+  transactionId String?  @map("transaction_id")
+  date          DateTime @map("date")
+
+  customerId     String? @map("customer_id")
+  customerName   String? @map("customer_name")
+  phoneNumber    String? @map("phone_number")
+  gender         String? @map("gender")
+  age            Int?    @map("age")
+  customerRegion String? @map("customer_region")
+  customerType   String? @map("customer_type")
+
+  productId       String?  @map("product_id")
+  productName     String?  @map("product_name")
+  brand           String?  @map("brand")
+  productCategory String?  @map("product_category")
+  tags            String[] @map("tags") @db.Text
+
+  quantity           Int?   @map("quantity")
+  pricePerUnit       Float? @map("price_per_unit")
+  discountPercentage Float? @map("discount_percentage")
+  totalAmount        Float? @map("total_amount")
+  finalAmount        Float? @map("final_amount")
+
+  paymentMethod String? @map("payment_method")
+  orderStatus   String? @map("order_status")
+  deliveryType  String? @map("delivery_type")
+  storeId       String? @map("store_id")
+  storeLocation String? @map("store_location")
+  salespersonId String? @map("salesperson_id")
+  employeeName  String? @map("employee_name")
+
+  @@index([customerName])
+  @@index([phoneNumber])
+  @@index([customerRegion])
+  @@index([gender])
+  @@index([age])
+  @@index([productCategory])
+  @@index([paymentMethod])
+  @@index([date])
+  @@index([quantity])
+  @@index([customerName, date])
+  @@index([productId])
+  @@index([salespersonId])
+  @@index([tags], type: Gin)
+  @@map("transactions")
+}

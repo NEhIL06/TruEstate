@@ -1,18 +1,9 @@
-import { supabase } from "./supaBaseClient";
-import { Transaction, TransactionQueryParams } from "../models/transaction";
-import { AppError } from "../utils/errors";
-import { getPagination } from "../utils/pagination";
-
-export interface TransactionResult {
-  data: Transaction[];
-  totalItems: number;
-  totalPages: number;
-  currentPage: number;
-  pageSize: number;
-}
+import prisma from "../prisma/client";
+import { TransactionQueryParams } from "../models/transaction";
+import { Prisma } from "../../generated/prisma/client";
 
 export class TransactionService {
-  async getTransactions(params: TransactionQueryParams): Promise<TransactionResult> {
+  async getTransactions(params: TransactionQueryParams) {
     const {
       search,
       customerRegions,
@@ -30,86 +21,92 @@ export class TransactionService {
       pageSize = 10
     } = params;
 
-    const { from, to } = getPagination(page, pageSize);
+    const skip = (page - 1) * pageSize;
 
-    let query = supabase
-      .from("transactions")
-      .select("*", { count: "exact" })
-      .range(from, to);
+    const where: Prisma.TransactionWhereInput = {
+      AND: []
+    };
 
-    if (search && search.trim().length > 0) {
-      const term = search.trim();
-      query = query.or(
-        `customer_name.ilike.%${term}%,phone_number.ilike.%${term}%`
-      );
+    const andConditions = where.AND as Prisma.TransactionWhereInput[];
+
+    if (search) {
+      andConditions.push({
+        OR: [
+          { customerName: { contains: search, mode: "insensitive" } },
+          { phoneNumber: { contains: search, mode: "insensitive" } }
+        ]
+      });
     }
 
-    if (customerRegions && customerRegions.length > 0) {
-      query = query.in("customer_region", customerRegions);
+    if (customerRegions?.length) {
+      andConditions.push({ customerRegion: { in: customerRegions } });
     }
 
-    if (genders && genders.length > 0) {
-      query = query.in("gender", genders);
+    if (genders?.length) {
+      andConditions.push({ gender: { in: genders } });
     }
 
     if (ageMin !== undefined) {
-      query = query.gte("age", ageMin);
+      andConditions.push({ age: { gte: ageMin } });
     }
+
     if (ageMax !== undefined) {
-      query = query.lte("age", ageMax);
+      andConditions.push({ age: { lte: ageMax } });
     }
 
-    if (productCategories && productCategories.length > 0) {
-      query = query.in("product_category", productCategories);
+    if (productCategories?.length) {
+      andConditions.push({ productCategory: { in: productCategories } });
     }
 
-    if (paymentMethods && paymentMethods.length > 0) {
-      query = query.in("payment_method", paymentMethods);
+    if (paymentMethods?.length) {
+      andConditions.push({ paymentMethod: { in: paymentMethods } });
     }
 
     if (dateFrom) {
-      query = query.gte("date", dateFrom);
+      andConditions.push({ date: { gte: new Date(dateFrom) } });
     }
+
     if (dateTo) {
-      query = query.lte("date", dateTo);
+      andConditions.push({ date: { lte: new Date(dateTo) } });
     }
 
-    if (tags && tags.length > 0) {
-      const tagArrayLiteral = `{${tags.join(",")}}`;
-      query = query.filter("tags", "cs", tagArrayLiteral);
+    if (tags?.length) {
+      andConditions.push({ tags: { hasSome: tags } });
     }
 
-    let sortColumn: string;
-    switch (sortBy) {
-      case "quantity":
-        sortColumn = "quantity";
-        break;
-      case "customerName":
-        sortColumn = "customer_name";
-        break;
-      case "date":
-      default:
-        sortColumn = "date";
-        break;
+    if (andConditions.length === 0) {
+      delete where.AND;
     }
 
-    query = query.order(sortColumn, { ascending: sortOrder === "asc" });
+    const sortColumnMap: Record<string, keyof Prisma.TransactionOrderByWithRelationInput> = {
+      date: "date",
+      quantity: "quantity",
+      customerName: "customerName"
+    };
 
-    const { data, count, error } = await query;
+    const orderBy: Prisma.TransactionOrderByWithRelationInput = {
+      [sortColumnMap[sortBy] || "date"]: sortOrder
+    };
 
-    if (error) {
-      throw new AppError("Failed to fetch transactions", 500, error);
-    }
-
-    const totalItems = count ?? 0;
-    const totalPages = totalItems === 0 ? 0 : Math.ceil(totalItems / pageSize);
+    const [data, totalItems] = await Promise.all([
+      prisma.transaction.findMany({
+        where,
+        orderBy,
+        skip,
+        take: pageSize,
+      }),
+      prisma.transaction.count({ where })
+    ]);
 
     return {
-      data: (data ?? []) as Transaction[],
+      data: data.map(item => ({
+        ...item,
+        id: item.id.toString() // Convert BigInt to string for JSON serialization
+      })),
       totalItems,
-      totalPages,
+      totalPages: Math.ceil(totalItems / pageSize),
       currentPage: page,
-      pageSize
+      pageSize: pageSize
     };
   }
 }

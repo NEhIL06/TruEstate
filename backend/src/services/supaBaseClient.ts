@@ -1,4 +1,8 @@
-import { createClient } from "@supabase/supabase-js";
+import postgres from "postgres";
 import { env } from "../utils/env";
 
-export const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
+export const sql = postgres(env.DATABASE_URL, {
+  ssl: "require",   
+  max: 10,          
+  idle_timeout: 20, 
+});
