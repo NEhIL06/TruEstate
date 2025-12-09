@@ -14,14 +14,14 @@ interface SummaryCardsProps {
 export function SummaryCards({ totalUnits, totalAmount, totalDiscount, isLoading }: SummaryCardsProps) {
   const cards = [
     {
-      title: "Total Units Sold",
+      title: "Total Units Sold (Page Only)",
       value: totalUnits.toLocaleString(),
       icon: Package,
       color: "text-blue-600 dark:text-blue-400",
       bgColor: "bg-blue-100 dark:bg-blue-900/30",
     },
     {
-      title: "Total Amount",
+      title: "Total Amount (Page Only)",
       value: `$${totalAmount.toLocaleString("en-US", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
@@ -31,7 +31,7 @@ export function SummaryCards({ totalUnits, totalAmount, totalDiscount, isLoading
       bgColor: "bg-emerald-100 dark:bg-emerald-900/30",
     },
     {
-      title: "Total Discount",
+      title: "Total Discount (Page Only)",
       value: `$${totalDiscount.toLocaleString("en-US", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,

@@ -50,12 +50,28 @@ export async function fetchFilterOptions(): Promise<{
   tags: string[]
   paymentMethods: string[]
 }> {
-  
+
   return {
-    regions: ["North", "South", "East", "West", "Central"],
-    genders: ["Male", "Female", "Other"],
-    categories: ["Electronics", "Clothing", "Food", "Home", "Sports", "Beauty"],
-    tags: ["Premium", "Sale", "New", "Popular", "Limited"],
-    paymentMethods: ["Cash", "Credit Card", "Debit Card", "Digital Wallet"],
+    regions: ["Central", "East", "North", "South", "West"],
+    genders: ["Male", "Female"],
+    categories: ["Beauty", "Clothing", "Electronics"],
+    tags: [
+      "accessories",
+      "beauty",
+      "casual",
+      "cotton",
+      "fashion",
+      "formal",
+      "fragrance-free",
+      "gadgets",
+      "makeup",
+      "organic",
+      "portable",
+      "skincare",
+      "smart",
+      "unisex",
+      "wireless",
+    ],
+    paymentMethods: ["Cash", "Credit Card", "Debit Card", "Net Banking", "UPI", "Wallet"],
   }
 }
